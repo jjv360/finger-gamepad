@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Finger Gamepad</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body>
+
+        <!-- Style -->
+        <style>
+            html, body {
+                /* width: 100%;
+                height: 100%;
+                margin: 0px;
+                padding: 0px; */
+                background-color: #222;
+                overflow: hidden;
+            }
+        </style>
+
+        <!-- Text in the center -->
+        <div id='text' style="display: flex; align-items: center; justify-content: center; position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; color: rgba(255, 255, 255, 0.05); text-align: center; font-family: Helvetica, Arial; font-size: 50px; ">
+            Connecting...
+        </div>
+
+        <!-- Code -->
+        <script>
+
+            // Vars
+            let ws = null
+            let isOpen = false
+            let activePointers = []
+
+            // Analog stick sensitivity, higher numbers mean less sensitive
+            let analogSensitivity = 10
+
+            // On start
+            window.addEventListener('DOMContentLoaded', function() {
+
+                // Create websocket connection
+                ws = new WebSocket(`ws://${location.host}/socket`)
+
+                // Called on open
+                ws.addEventListener('open', function() {
+
+                    // Ready to go
+                    document.getElementById('text').innerText = 'Finger Gamepad'
+                    isOpen = true
+
+                })
+
+                // Called on error
+                ws.addEventListener('error', function(e) {
+
+                    // Ready to go
+                    document.getElementById('text').innerText = 'ERROR: ' + (e.message || 'Closed')
+                    isOpen = false
+
+                })
+
+            })
+
+            // Prevent scrolling etc
+            document.body.addEventListener('touchstart', e => e.preventDefault(), { passive: false })
+            document.body.addEventListener('touchmove', e => e.preventDefault(), { passive: false })
+
+            // Called when touch begins
+            document.body.addEventListener('pointerdown', e => {
+                e.preventDefault()
+
+                // Add this pointer to the list of active pointers
+                activePointers.push({
+                    id: e.pointerId,
+                    originalX: e.clientX,
+                    originalY: e.clientY,
+                    currentX: e.clientX,
+                    currentY: e.clientY,
+                })
+
+                // Re-sort the pointer array
+                activePointers = activePointers.sort((a, b) => a.originalX - b.originalX)
+
+            })
+
+            // Called when touch ends
+            document.body.addEventListener('pointerup', e => {
+                e.preventDefault()
+
+                // Remove this pointer
+                activePointers = activePointers.filter(p => p.id != e.pointerId)
+
+                // Send update
+                sendUpdate()
+
+            })
+
+            // Called when a pointer moves
+            document.body.addEventListener('pointermove', e => {
+                e.preventDefault()
+
+                // Find current pointer
+                let pointer = activePointers.find(p => p.id == e.pointerId)
+                if (!pointer)
+                    return
+
+                // Update current value
+                pointer.currentX = e.clientX
+                pointer.currentY = e.clientY
+
+                // Send update
+                sendUpdate()
+
+            })
+
+            // Send update to web socket server
+            function sendUpdate() {
+
+                // Stop if not connected
+                if (!isOpen)
+                    return
+
+                // Create info object to send
+                let info = {}
+
+                // First finger represents the left stick
+                if (activePointers.length >= 1) {
+                    info.lx = (activePointers[0].currentX - activePointers[0].originalX) / analogSensitivity
+                    info.ly = (activePointers[0].currentY - activePointers[0].originalY) / analogSensitivity * -1 // <-- Y seems inverted
+                }
+
+                // Second finger represents the right stick
+                if (activePointers.length >= 2) {
+                    info.rx = (activePointers[1].currentX - activePointers[1].originalX) / analogSensitivity
+                    info.ry = (activePointers[1].currentY - activePointers[1].originalY) / analogSensitivity * -1 // <-- Y seems inverted
+                }
+
+                // Third finger represents A, B, X, Y
+                if (activePointers.length >= 3) {
+                    if ((activePointers[2].currentX - activePointers[2].originalX) / analogSensitivity >  0.5) info.b = 1
+                    if ((activePointers[2].currentX - activePointers[2].originalX) / analogSensitivity < -0.5) info.x = 1
+                    if ((activePointers[2].currentY - activePointers[2].originalY) / analogSensitivity >  0.5) info.y = 1
+                    if ((activePointers[2].currentY - activePointers[2].originalY) / analogSensitivity < -0.5) info.a = 1
+                }
+
+                // Fourth finger represents d-pad
+                if (activePointers.length >= 4) {
+                    if ((activePointers[3].currentX - activePointers[3].originalX) / analogSensitivity >  0.5) info.dpadRight = 1
+                    if ((activePointers[3].currentX - activePointers[3].originalX) / analogSensitivity < -0.5) info.dpadLeft = 1
+                    if ((activePointers[3].currentY - activePointers[3].originalY) / analogSensitivity >  0.5) info.dpadDown = 1
+                    if ((activePointers[3].currentY - activePointers[3].originalY) / analogSensitivity < -0.5) info.dpadUp = 1
+                }
+
+                // Send it
+                ws.send(JSON.stringify(info))
+
+            }
+
+        </script>
+
+    </body>
+</html>

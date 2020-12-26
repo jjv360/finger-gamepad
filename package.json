@@ -1,0 +1,24 @@
+{
+  "name": "finger-gamepad",
+  "version": "1.0.0",
+  "description": "Play games with your fingers.",
+  "main": "src/start.js",
+  "scripts": {
+    "start": "node src/start.js"
+  },
+  "keywords": [
+    "finger",
+    "gamepad",
+    "virtual",
+    "touch"
+  ],
+  "author": "jjv360",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "ffi-napi": "^3.1.0",
+    "ref-napi": "^3.0.1",
+    "ref-struct-napi": "^1.1.1",
+    "ws": "^7.4.1"
+  }
+}
